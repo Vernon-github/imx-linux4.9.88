@@ -4,11 +4,22 @@
 #include <linux/i2c.h>
 #include <linux/device.h>
 
+struct ap3216c_dev {
+	unsigned char addr;				/* chip address - NOTE: 7bit*/
+	struct i2c_adapter *adapter;	/* the adapter we sit on	*/
+	struct device dev;				/* the device structure		*/
+};
+struct ap3216c_dev ap3216cDev;
+
 int ap3216c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct device dev = client->dev;
 
-	dev_dbg(&dev, "%s\n", __func__);
+	ap3216cDev.addr = client->addr;
+	ap3216cDev.adapter = client->adapter;
+	ap3216cDev.dev = client->dev;
+
+	dev_dbg(&dev, "%s: i2c addr 0x%x[7bits]\n", __func__, ap3216cDev.addr);
 
 	return 0;
 }
