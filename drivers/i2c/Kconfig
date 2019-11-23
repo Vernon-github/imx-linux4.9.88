@@ -54,7 +54,7 @@ config I2C_CHARDEV
 	  programs use the I2C bus.  Information on how to do this is
 	  contained in the file <file:Documentation/i2c/dev-interface>.
 
-	  This support is also available as a module.  If so, the module 
+	  This support is also available as a module.  If so, the module
 	  will be called i2c-dev.
 
 config I2C_MUX
@@ -116,6 +116,9 @@ if I2C_SLAVE
 
 config I2C_SLAVE_EEPROM
 	tristate "I2C eeprom slave driver"
+
+config I2C_SLAVE_AP3216C
+	tristate "I2C ap3216c slave driver"
 
 endif
 

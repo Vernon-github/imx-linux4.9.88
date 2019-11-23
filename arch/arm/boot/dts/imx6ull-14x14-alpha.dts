@@ -296,8 +296,10 @@
 	};
 
 	ap3216c@1e {
-		compatible = "ap3216c";
+		compatible = "lsc,ap3216c";
 		reg = <0x1e>;
+
+		status = "okay";
 	};
 };
 
@@ -719,7 +721,7 @@
                                 MX6ULL_PAD_SNVS_TAMPER3__GPIO5_IO03      0x79
                         >;
                 };
-		
+
 		pinctrl_lcdif_reset: lcdifresetgrp {
                         fsl,pins = <
                                 /* used for lcd reset */

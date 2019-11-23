@@ -3,6 +3,7 @@ CPU=$(cat /proc/cpuinfo |grep 'processor' |wc -l)
 export PATH=$PATH:../ToolChain/gcc-linaro-6.2.1-2016.11-x86_64_arm-linux-gnueabihf/bin
 export ARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-
+export KBUILD_OUTPUT=output
 
 #step 1:clean kernel
 #make distclean
@@ -26,7 +27,7 @@ make modules  -j$CPU
 
 echo -e "\033[32m zImage and imx6ull-14x14-alpha.dtb directory \033[0m"
 
-ls arch/arm/boot/zImage -la
-ls arch/arm/boot/dts/imx6ull-14x14-alpha.dtb -la
+ls output/arch/arm/boot/zImage -la
+ls output/arch/arm/boot/dts/imx6ull-14x14-alpha.dtb -la
 
 echo -e "\033[32m ------------------------------------- \033[0m"
