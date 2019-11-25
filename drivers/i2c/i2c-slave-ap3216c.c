@@ -6,6 +6,16 @@
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <asm/uaccess.h>
+#include <linux/delay.h>
+
+/* AP3316C寄存器 */
+#define AP3216C_SYSTEMCONG	0x00	/* 配置寄存器     */
+#define AP3216C_IRDATALOW	0x0A	/* IR数据低字节   */
+#define AP3216C_IRDATAHIGH	0x0B	/* IR数据高字节   */
+#define AP3216C_ALSDATALOW	0x0C	/* ALS数据低字节  */
+#define AP3216C_ALSDATAHIGH	0X0D	/* ALS数据高字节  */
+#define AP3216C_PSDATALOW	0X0E	/* PS数据低字节   */
+#define AP3216C_PSDATAHIGH	0X0F	/* PS数据高字节   */
 
 struct ap3216c_dev {
 	unsigned char addr;				/* chip address - NOTE: 7bit*/
@@ -18,12 +28,52 @@ struct ap3216c_dev {
 };
 struct ap3216c_dev ap3216cDev;
 
+void ap3216c_write_regs(u8 reg, u8 *buf, u8 len)
+{
+	struct i2c_msg msg;
+	u8 buffer[256];
+
+	msg.addr = ap3216cDev.addr;
+	msg.flags = 0;
+	msg.len = len + 1;
+
+	buffer[0] = reg;
+	memcpy(&buffer[1], buf, len);
+	msg.buf = buffer;
+
+	i2c_transfer(ap3216cDev.adapter, &msg, 1);
+}
+
+void ap3216c_read_regs(u8 reg, u8 *buf, u8 len)
+{
+	struct i2c_msg msg[2];
+
+	msg[0].addr = ap3216cDev.addr;
+	msg[0].flags = 0;
+	msg[0].buf = &reg;
+	msg[0].len = 1;
+
+	msg[1].addr = ap3216cDev.addr;
+	msg[1].flags = I2C_M_RD;
+	msg[1].buf = buf;
+	msg[1].len = len;
+
+	i2c_transfer(ap3216cDev.adapter, msg, 2);
+}
 
 int ap3216c_open(struct inode *inode, struct file *file)
 {
 	struct device dev = ap3216cDev.dev;
+	u8 val;
 
 	dev_dbg(&dev, "%s\n", __func__);
+
+	val = 0x04;
+	ap3216c_write_regs(AP3216C_SYSTEMCONG, &val, 1); /* 复位AP3216C */
+	mdelay(50);                                      /* AP3216C复位最少10ms */
+	val = 0x03;
+	ap3216c_write_regs(AP3216C_SYSTEMCONG, &val, 1); /* 开启ALS、PS+IR */
+	mdelay(120);
 
 	return 0;
 }
@@ -40,13 +90,26 @@ int ap3216c_release(struct inode *inode, struct file *file)
 ssize_t ap3216c_read(struct file *file, char __user *buf, size_t size, loff_t *offset)
 {
 	struct device dev = ap3216cDev.dev;
-	unsigned char val;
-	int ret;
+	unsigned char buffer[6];
+	unsigned short ir, als, ps, ir_als_ps[3];
+	int i, ret;
 
 	dev_dbg(&dev, "%s\n", __func__);
 
-	val = 1;
-	ret = copy_to_user(buf, &val, size);
+	for(i=0; i<sizeof(buffer); i++) {
+		ap3216c_read_regs(AP3216C_IRDATALOW + i, &buffer[i], 1);
+	}
+
+	ir = (buffer[1] << 2) | (buffer[0] & 0X03);
+	als = (buffer[3] << 8) | buffer[2];
+	ps = ((buffer[5] & 0X3F) << 4) | (buffer[4] & 0X0F);
+	dev_dbg(&dev, "%s: ir 0x%x, als 0x%x, ps 0x%x\n", __func__, ir, als, ps);
+
+	ir_als_ps[0] = ir;
+	ir_als_ps[1] = als;
+	ir_als_ps[2] = ps;
+
+	ret = copy_to_user(buf, ir_als_ps, size);
 
 	return ret;
 }
