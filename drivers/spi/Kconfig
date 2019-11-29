@@ -296,6 +296,12 @@ config SPI_IMX
 	  This enables using the Freescale i.MX SPI controllers in master
 	  mode.
 
+config SPI_SLAVE_ICM20608
+	tristate "Freescale i.MX SPI slave icm20608"
+	depends on SPI_IMX
+	help
+	  This enables using the Freescale i.MX SPI icm20608 device.
+
 config SPI_JCORE
 	tristate "J-Core SPI Master"
 	depends on OF && (SUPERH || COMPILE_TEST)

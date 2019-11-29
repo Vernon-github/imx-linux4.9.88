@@ -218,9 +218,11 @@
         status = "okay";
 
 	spidev: icm20608@0 {
-	compatible = "alientek,icm20608";
+		compatible = "alientek,icm20608";
         spi-max-frequency = <8000000>;
         reg = <0>;
+
+		status = "okay";
     };
 };
 
