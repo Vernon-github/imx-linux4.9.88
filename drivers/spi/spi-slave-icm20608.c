@@ -4,11 +4,19 @@
 #include <linux/spi/spi.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
+#include <linux/device.h>
+#include <linux/cdev.h>
+#include <linux/fs.h>
+#include <asm/uaccess.h>
 #include "spi-slave-icm20608.h"
 
 struct icm20608_dev {
     struct spi_device *spi;
     int cs_gpio;
+
+    dev_t devid;
+    struct cdev cdev;
+    struct class *class;
 
     void (* read)(u8 , void *, int );
     void (* write)(u8 , void *, int );
@@ -73,6 +81,47 @@ void icm20608_write_regs(u8 reg, void *buf, int len)
     kfree(t);
 }
 
+int icm20608_open(struct inode *inode, struct file *file)
+{
+    struct spi_device *spi = icm20608Dev.spi;
+    struct device dev = spi->dev;
+
+    dev_dbg(&dev, "%s: \n", __func__);
+
+    return 0;
+}
+
+int icm20608_release(struct inode *inode, struct file *file)
+{
+    struct spi_device *spi = icm20608Dev.spi;
+    struct device dev = spi->dev;
+
+    dev_dbg(&dev, "%s: \n", __func__);
+
+    return 0;
+}
+
+ssize_t icm20608_read(struct file *file, char __user *buf, size_t size, loff_t *offset)
+{
+    struct spi_device *spi = icm20608Dev.spi;
+    struct device dev = spi->dev;
+    int ret;
+    unsigned char val = 2;
+
+    dev_dbg(&dev, "%s: \n", __func__);
+
+    ret = copy_to_user(buf, &val, size);
+
+    return 0;
+}
+
+const struct file_operations icm20608_fops = {
+    .owner    = THIS_MODULE,
+    .open     = icm20608_open,
+    .release  = icm20608_release,
+    .read     = icm20608_read,
+};
+
 int	icm20608_probe(struct spi_device *spi)
 {
     struct device dev = spi->dev;
@@ -92,6 +141,12 @@ int	icm20608_probe(struct spi_device *spi)
     icm20608Dev.read = icm20608_read_regs;
     icm20608Dev.write = icm20608_write_regs;
 
+    alloc_chrdev_region(&icm20608Dev.devid, 0, 1, "icm20608CharDev");
+    cdev_init(&icm20608Dev.cdev, &icm20608_fops);
+    cdev_add(&icm20608Dev.cdev, icm20608Dev.devid, 1);
+    icm20608Dev.class = class_create(THIS_MODULE, "icm20608Class");
+    device_create(icm20608Dev.class, NULL, icm20608Dev.devid, NULL, "icm20608Dev");
+
     return 0;
 }
 
@@ -100,6 +155,11 @@ int	icm20608_remove(struct spi_device *spi)
     struct device dev = spi->dev;
 
     dev_dbg(&dev, "%s: \n", __func__);
+
+    device_destroy(icm20608Dev.class, icm20608Dev.devid);
+    class_destroy(icm20608Dev.class);
+    cdev_del(&icm20608Dev.cdev);
+    unregister_chrdev_region(icm20608Dev.devid, 1);
 
     return 0;
 }
