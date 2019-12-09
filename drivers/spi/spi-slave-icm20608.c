@@ -8,6 +8,7 @@
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <asm/uaccess.h>
+#include <linux/delay.h>
 #include "spi-slave-icm20608.h"
 
 struct icm20608_dev {
@@ -81,12 +82,40 @@ void icm20608_write_regs(u8 reg, void *buf, int len)
     kfree(t);
 }
 
+void icm20608_read_onereg(u8 reg, u8 *val)
+{
+    icm20608_read_regs(reg, val, 1);
+}
+
+void icm20608_write_onereg(u8 reg, u8 val)
+{
+    icm20608_write_regs(reg, &val, 1);
+}
+
 int icm20608_open(struct inode *inode, struct file *file)
 {
     struct spi_device *spi = icm20608Dev.spi;
     struct device dev = spi->dev;
+    u8 id;
 
     dev_dbg(&dev, "%s: \n", __func__);
+
+    icm20608_write_onereg(ICM20_PWR_MGMT_1, 0x80);
+    mdelay(50);
+    icm20608_write_onereg(ICM20_PWR_MGMT_1, 0x01);
+    mdelay(50);
+
+    icm20608_read_onereg(ICM20_WHO_AM_I, &id);
+    dev_info(&dev, "ICM20608 ID = %#X\r\n", id);
+
+    icm20608_write_onereg(ICM20_SMPLRT_DIV,    0x00); /* 输出速率是内部采样率      */
+    icm20608_write_onereg(ICM20_GYRO_CONFIG,   0x18); /* 陀螺仪±2000dps量程      */
+    icm20608_write_onereg(ICM20_ACCEL_CONFIG,  0x18); /* 加速度计±16G量程         */
+    icm20608_write_onereg(ICM20_CONFIG,        0x04); /* 陀螺仪低通滤波BW=20Hz    */
+    icm20608_write_onereg(ICM20_ACCEL_CONFIG2, 0x04); /* 加速度计低通滤波BW=21.2Hz */
+    icm20608_write_onereg(ICM20_PWR_MGMT_2,    0x00); /* 打开加速度计和陀螺仪所有轴  */
+    icm20608_write_onereg(ICM20_LP_MODE_CFG,   0x00); /* 关闭低功耗               */
+    icm20608_write_onereg(ICM20_FIFO_EN,       0x00); /* 关闭FIFO                */
 
     return 0;
 }
@@ -105,12 +134,32 @@ ssize_t icm20608_read(struct file *file, char __user *buf, size_t size, loff_t *
 {
     struct spi_device *spi = icm20608Dev.spi;
     struct device dev = spi->dev;
+    unsigned char data[14];
+    unsigned short accel_x_adc, accel_y_adc, accel_z_adc, temp_adc;
+    unsigned short gyro_x_adc, gyro_y_adc, gyro_z_adc;
+    unsigned short accel_temp_gyro[7];
     int ret;
-    unsigned char val = 2;
 
     dev_dbg(&dev, "%s: \n", __func__);
 
-    ret = copy_to_user(buf, &val, size);
+    icm20608_read_regs(ICM20_ACCEL_XOUT_H, data, sizeof(data));
+    accel_x_adc = (signed short)((data[0] << 8) | data[1]);
+    accel_y_adc = (signed short)((data[2] << 8) | data[3]);
+    accel_z_adc = (signed short)((data[4] << 8) | data[5]);
+    temp_adc    = (signed short)((data[6] << 8) | data[7]);
+    gyro_x_adc  = (signed short)((data[8] << 8) | data[9]);
+    gyro_y_adc  = (signed short)((data[10] << 8) | data[11]);
+    gyro_z_adc  = (signed short)((data[12] << 8) | data[13]);
+
+    accel_temp_gyro[0] = accel_x_adc;
+    accel_temp_gyro[1] = accel_y_adc;
+    accel_temp_gyro[2] = accel_z_adc;
+    accel_temp_gyro[3] = temp_adc;
+    accel_temp_gyro[4] = gyro_x_adc;
+    accel_temp_gyro[5] = gyro_y_adc;
+    accel_temp_gyro[6] = gyro_z_adc;
+
+    ret = copy_to_user(buf, accel_temp_gyro, size);
 
     return 0;
 }
@@ -126,7 +175,7 @@ int	icm20608_probe(struct spi_device *spi)
 {
     struct device dev = spi->dev;
     struct device_node *np = dev.of_node;
-    int cs_gpio;
+    unsigned int cs_gpio;
 
     dev_dbg(&dev, "%s: \n", __func__);
 

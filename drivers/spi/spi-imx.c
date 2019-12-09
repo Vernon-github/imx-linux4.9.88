@@ -1290,7 +1290,7 @@ static int spi_imx_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
 		goto out_clk_put;
 	}
-
+/*
 	if (!master->cs_gpios) {
 		dev_err(&pdev->dev, "No CS GPIOs available\n");
 		ret = -EINVAL;
@@ -1309,7 +1309,7 @@ static int spi_imx_probe(struct platform_device *pdev)
 			goto out_clk_put;
 		}
 	}
-
+*/
 	dev_info(&pdev->dev, "probed\n");
 
 	clk_disable_unprepare(spi_imx->clk_ipg);
