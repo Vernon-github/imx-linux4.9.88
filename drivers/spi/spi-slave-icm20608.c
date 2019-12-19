@@ -1,4 +1,4 @@
-#define DEBUG
+/* #define DEBUG */
 
 #include <linux/module.h>
 #include <linux/spi/spi.h>
@@ -9,113 +9,45 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <linux/delay.h>
+#include <linux/regmap.h>
 #include "spi-slave-icm20608.h"
 
 struct icm20608_dev {
     struct spi_device *spi;
-    int cs_gpio;
 
     dev_t devid;
     struct cdev cdev;
     struct class *class;
 
-    void (* read)(u8 , void *, int );
-    void (* write)(u8 , void *, int );
+    struct regmap *map;
 };
 struct icm20608_dev icm20608Dev;
-
-void icm20608_read_regs(u8 reg, void *buf, int len)
-{
-    struct spi_device *spi = icm20608Dev.spi;
-    struct device dev = spi->dev;
-    struct spi_message m;
-    struct spi_transfer *t;
-    u8 spiReg = reg | 0x80;
-
-    dev_dbg(&dev, "%s: \n", __func__);
-
-    t = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
-    gpio_set_value(icm20608Dev.cs_gpio, 0);
-
-    t->tx_buf = &spiReg;
-    t->len = 1;
-    spi_message_init(&m);
-    spi_message_add_tail(t, &m);
-    spi_sync(spi, &m);
-
-    t->rx_buf = buf;
-    t->len = len;
-    spi_message_init(&m);
-    spi_message_add_tail(t, &m);
-    spi_sync(spi, &m);
-
-    gpio_set_value(icm20608Dev.cs_gpio, 1);
-    kfree(t);
-}
-
-void icm20608_write_regs(u8 reg, void *buf, int len)
-{
-    struct spi_device *spi = icm20608Dev.spi;
-    struct device dev = spi->dev;
-    struct spi_message m;
-    struct spi_transfer *t;
-    u8 spiReg = reg & (~0x80);
-
-    dev_dbg(&dev, "%s: \n", __func__);
-
-    t = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
-    gpio_set_value(icm20608Dev.cs_gpio, 0);
-
-    t->tx_buf = &spiReg;
-    t->len = 1;
-    spi_message_init(&m);
-    spi_message_add_tail(t, &m);
-    spi_sync(spi, &m);
-
-    t->tx_buf = buf;
-    t->len = len;
-    spi_message_init(&m);
-    spi_message_add_tail(t, &m);
-    spi_sync(spi, &m);
-
-    gpio_set_value(icm20608Dev.cs_gpio, 1);
-    kfree(t);
-}
-
-void icm20608_read_onereg(u8 reg, u8 *val)
-{
-    icm20608_read_regs(reg, val, 1);
-}
-
-void icm20608_write_onereg(u8 reg, u8 val)
-{
-    icm20608_write_regs(reg, &val, 1);
-}
 
 int icm20608_open(struct inode *inode, struct file *file)
 {
     struct spi_device *spi = icm20608Dev.spi;
     struct device dev = spi->dev;
-    u8 id;
+    struct regmap *map = icm20608Dev.map;
+    unsigned int id;
 
     dev_dbg(&dev, "%s: \n", __func__);
 
-    icm20608_write_onereg(ICM20_PWR_MGMT_1, 0x80);
+    regmap_write(map, ICM20_PWR_MGMT_1, 0x80);
     mdelay(50);
-    icm20608_write_onereg(ICM20_PWR_MGMT_1, 0x01);
+    regmap_write(map, ICM20_PWR_MGMT_1, 0x01);
     mdelay(50);
 
-    icm20608_read_onereg(ICM20_WHO_AM_I, &id);
+    regmap_read(map, ICM20_WHO_AM_I, &id);
     dev_info(&dev, "ICM20608 ID = %#X\r\n", id);
 
-    icm20608_write_onereg(ICM20_SMPLRT_DIV,    0x00); /* 输出速率是内部采样率      */
-    icm20608_write_onereg(ICM20_GYRO_CONFIG,   0x18); /* 陀螺仪±2000dps量程      */
-    icm20608_write_onereg(ICM20_ACCEL_CONFIG,  0x18); /* 加速度计±16G量程         */
-    icm20608_write_onereg(ICM20_CONFIG,        0x04); /* 陀螺仪低通滤波BW=20Hz    */
-    icm20608_write_onereg(ICM20_ACCEL_CONFIG2, 0x04); /* 加速度计低通滤波BW=21.2Hz */
-    icm20608_write_onereg(ICM20_PWR_MGMT_2,    0x00); /* 打开加速度计和陀螺仪所有轴  */
-    icm20608_write_onereg(ICM20_LP_MODE_CFG,   0x00); /* 关闭低功耗               */
-    icm20608_write_onereg(ICM20_FIFO_EN,       0x00); /* 关闭FIFO                */
+    regmap_write(map, ICM20_SMPLRT_DIV,    0x00); /* 输出速率是内部采样率      */
+    regmap_write(map, ICM20_GYRO_CONFIG,   0x18); /* 陀螺仪±2000dps量程      */
+    regmap_write(map, ICM20_ACCEL_CONFIG,  0x18); /* 加速度计±16G量程         */
+    regmap_write(map, ICM20_CONFIG,        0x04); /* 陀螺仪低通滤波BW=20Hz    */
+    regmap_write(map, ICM20_ACCEL_CONFIG2, 0x04); /* 加速度计低通滤波BW=21.2Hz */
+    regmap_write(map, ICM20_PWR_MGMT_2,    0x00); /* 打开加速度计和陀螺仪所有轴  */
+    regmap_write(map, ICM20_LP_MODE_CFG,   0x00); /* 关闭低功耗               */
+    regmap_write(map, ICM20_FIFO_EN,       0x00); /* 关闭FIFO                */
 
     return 0;
 }
@@ -134,15 +66,21 @@ ssize_t icm20608_read(struct file *file, char __user *buf, size_t size, loff_t *
 {
     struct spi_device *spi = icm20608Dev.spi;
     struct device dev = spi->dev;
-    unsigned char data[14];
+    struct regmap *map = icm20608Dev.map;
+    unsigned int data[14];
     unsigned short accel_x_adc, accel_y_adc, accel_z_adc, temp_adc;
     unsigned short gyro_x_adc, gyro_y_adc, gyro_z_adc;
     unsigned short accel_temp_gyro[7];
-    int ret;
+    int ret, i;
 
     dev_dbg(&dev, "%s: \n", __func__);
 
-    icm20608_read_regs(ICM20_ACCEL_XOUT_H, data, sizeof(data));
+    for(i=0; i<(sizeof(data)/sizeof(unsigned int)); i++) {
+        regmap_read(map, ICM20_ACCEL_XOUT_H+i, data+i);
+
+        dev_dbg(&dev, "%s: [%d] %d\n", __func__, i, data[i]);
+    }
+
     accel_x_adc = (signed short)((data[0] << 8) | data[1]);
     accel_y_adc = (signed short)((data[2] << 8) | data[3]);
     accel_z_adc = (signed short)((data[4] << 8) | data[5]);
@@ -174,21 +112,19 @@ const struct file_operations icm20608_fops = {
 int	icm20608_probe(struct spi_device *spi)
 {
     struct device dev = spi->dev;
-    struct device_node *np = dev.of_node;
-    unsigned int cs_gpio;
+    struct regmap_config config;
 
     dev_dbg(&dev, "%s: \n", __func__);
-
-    cs_gpio = of_get_named_gpio(np->parent, "cs-gpio", 0);
-    gpio_direction_output(cs_gpio, 1);
 
     spi->mode = SPI_MODE_0; /*MODE0，CPOL=0，CPHA=0*/
     spi_setup(spi);
 
     icm20608Dev.spi = spi;
-    icm20608Dev.cs_gpio = cs_gpio;
-    icm20608Dev.read = icm20608_read_regs;
-    icm20608Dev.write = icm20608_write_regs;
+
+    memset(&config, 0, sizeof(config));
+    config.reg_bits = 8;
+    config.val_bits = 8;
+    icm20608Dev.map = devm_regmap_init_spi(spi, &config);
 
     alloc_chrdev_region(&icm20608Dev.devid, 0, 1, "icm20608CharDev");
     cdev_init(&icm20608Dev.cdev, &icm20608_fops);
