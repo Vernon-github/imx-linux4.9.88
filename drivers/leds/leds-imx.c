@@ -2,16 +2,13 @@
 
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/of_gpio.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/cdev.h>
 #include <asm/uaccess.h>
 
 struct led_dev {
 	struct platform_device *pdev;
-	unsigned int led_gpio;
-#define LED_ON  0
-#define LED_OFF 1
+	struct gpio_desc *led_gpio;
 
 	dev_t devid;
 	struct cdev cdev;
@@ -49,10 +46,7 @@ ssize_t led_write(struct file *file, const char __user *buf, size_t size, loff_t
 	ret = copy_from_user(&status, buf, size);
 	dev_dbg(&dev, "%s: status %d\n", __func__, status);
 
-	if(status)
-		gpio_set_value(ledDev.led_gpio, LED_ON);
-	else
-		gpio_set_value(ledDev.led_gpio, LED_OFF);
+	gpiod_set_value(ledDev.led_gpio, status);
 
 	return 0;
 }
@@ -67,13 +61,11 @@ const struct file_operations led_fops = {
 int led_probe(struct platform_device *pdev)
 {
 	struct device dev = pdev->dev;
-	struct device_node *np = dev.of_node;
-	unsigned int led_gpio;
+	struct gpio_desc *led_gpio;
 
 	dev_dbg(&dev, "%s: \n", __func__);
 
-	led_gpio = of_get_named_gpio(np, "led-gpios", 0);
-	gpio_direction_output(led_gpio, LED_OFF);
+	led_gpio = gpiod_get(&dev, "led", GPIOD_OUT_LOW);
 
 	ledDev.pdev = pdev;
 	ledDev.led_gpio = led_gpio;
@@ -92,6 +84,8 @@ int led_remove(struct platform_device *pdev)
 	struct device dev = pdev->dev;
 
 	dev_dbg(&dev, "%s: \n", __func__);
+
+	gpiod_put(ledDev.led_gpio);
 
 	device_destroy(ledDev.class, ledDev.devid);
 	class_destroy(ledDev.class);
