@@ -125,6 +125,13 @@ config LEDS_S3C24XX
 	  This option enables support for LEDs connected to GPIO lines
 	  on Samsung S3C24XX series CPUs, such as the S3C2410 and S3C2440.
 
+config LEDS_IMX
+	tristate "LED Support for fsl imx6ull GPIO LEDs"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for LEDs connected to GPIO lines
+	  on fsl IMX6Ull series CPUs, such as the imx6ull.
+
 config LEDS_NET48XX
 	tristate "LED Support for Soekris net48xx series Error LED"
 	depends on LEDS_CLASS

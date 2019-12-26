@@ -88,21 +88,30 @@
 	leds {
 		compatible = "gpio-leds";
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_gpio_leds
+		pinctrl-0 = </* &pinctrl_gpio_leds */
 			     &pinctrl_beep>;
-
+/*
 		led1{
 			label = "sys-led";
 			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
 			linux,default-trigger = "heartbeat";
 			default-state = "on";
 		};
-
+*/
 		beep{
 			label = "beep";
 			gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
 			default-state = "off";
 		};
+	};
+
+	atk-led {
+		compatible = "atk,led";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_led>;
+
+		led-gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+		state = "okay";
 	};
 
 	gpio_keys: gpio_keys@0 {
@@ -445,16 +454,22 @@
                                 MX6UL_PAD_UART2_TX_DATA__GPIO1_IO20       0x100b0  /* CS*/
                         >;
                 };
-
+/*
 		pinctrl_gpio_leds: gpio-leds {
 			fsl,pins = <
 				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
 			>;
 		};
-
+*/
 		pinctrl_gpio_keys: gpio-keys {
 			fsl,pins = <
 				MX6UL_PAD_UART1_CTS_B__GPIO1_IO18	0x80000000
+			>;
+		};
+
+		pinctrl_led: pinctrl-led {
+			fsl,pins = <
+				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
 			>;
 		};
 
