@@ -132,10 +132,10 @@
 */
 	atk-key {
 		compatible = "atk,key";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_key>;
 
-		key-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
+
 		state = "okay";
 	};
 
@@ -479,12 +479,6 @@
 		pinctrl_led: pinctrl-led {
 			fsl,pins = <
 				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
-			>;
-		};
-
-		pinctrl_key: pinctrl-key {
-			fsl,pins = <
-				MX6UL_PAD_UART1_CTS_B__GPIO1_IO18	0x80000000
 			>;
 		};
 
