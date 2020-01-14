@@ -113,7 +113,7 @@
 		led-gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
 		state = "okay";
 	};
-
+/*
 	gpio_keys: gpio_keys@0 {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
@@ -128,6 +128,15 @@
 			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
 			gpio-key,wakeup;
 		};
+	};
+*/
+	atk-key {
+		compatible = "atk,key";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_key>;
+
+		key-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
+		state = "okay";
 	};
 
 	sound {
@@ -460,16 +469,22 @@
 				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
 			>;
 		};
-*/
+
 		pinctrl_gpio_keys: gpio-keys {
 			fsl,pins = <
 				MX6UL_PAD_UART1_CTS_B__GPIO1_IO18	0x80000000
 			>;
 		};
-
+*/
 		pinctrl_led: pinctrl-led {
 			fsl,pins = <
 				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
+			>;
+		};
+
+		pinctrl_key: pinctrl-key {
+			fsl,pins = <
+				MX6UL_PAD_UART1_CTS_B__GPIO1_IO18	0x80000000
 			>;
 		};
 
