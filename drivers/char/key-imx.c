@@ -60,18 +60,17 @@ const struct file_operations key_fops = {
 	.read    = key_read,
 };
 
-void tasklet_func(unsigned long data)
+void work_func(struct work_struct *work)
 {
-	struct key_dev *p_keyDev = (struct key_dev *)data;
-	struct platform_device *pdev = p_keyDev->pdev;
-	struct device p_dev = pdev->dev;
+	struct platform_device *pdev = keyDev.pdev;
+	struct device dev = pdev->dev;
 
-	dev_dbg(&p_dev, "%s: \n", __func__);
+	dev_dbg(&dev, "%s: \n", __func__);
 
-	p_keyDev->key_val++;
+	keyDev.key_val++;
 }
 
-DECLARE_TASKLET(key_irq_tasklet, tasklet_func, (unsigned long)&keyDev);
+DECLARE_WORK(key_irq_work, work_func);
 
 static irqreturn_t key_irq_handler(int irq, void *dev)
 {
@@ -81,7 +80,7 @@ static irqreturn_t key_irq_handler(int irq, void *dev)
 
 	dev_dbg(&p_dev, "%s: \n", __func__);
 
-	tasklet_schedule(&key_irq_tasklet);
+	schedule_work(&key_irq_work);
 
 	return IRQ_HANDLED;
 }
