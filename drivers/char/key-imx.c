@@ -60,6 +60,19 @@ const struct file_operations key_fops = {
 	.read    = key_read,
 };
 
+void tasklet_func(unsigned long data)
+{
+	struct key_dev *p_keyDev = (struct key_dev *)data;
+	struct platform_device *pdev = p_keyDev->pdev;
+	struct device p_dev = pdev->dev;
+
+	dev_dbg(&p_dev, "%s: \n", __func__);
+
+	p_keyDev->key_val++;
+}
+
+DECLARE_TASKLET(key_irq_tasklet, tasklet_func, (unsigned long)&keyDev);
+
 static irqreturn_t key_irq_handler(int irq, void *dev)
 {
 	struct key_dev *p_keyDev = (struct key_dev *)dev;
@@ -67,7 +80,8 @@ static irqreturn_t key_irq_handler(int irq, void *dev)
 	struct device p_dev = pdev->dev;
 
 	dev_dbg(&p_dev, "%s: \n", __func__);
-	p_keyDev->key_val++;
+
+	tasklet_schedule(&key_irq_tasklet);
 
 	return IRQ_HANDLED;
 }
@@ -77,11 +91,16 @@ int key_probe(struct platform_device *pdev)
 	struct device dev = pdev->dev;
 	struct device_node *np = dev.of_node;
 	unsigned int key_irq;
+	unsigned int ret;
 
 	dev_dbg(&dev, "%s: \n", __func__);
 
 	key_irq = irq_of_parse_and_map(np, 0);
-	request_irq(key_irq, key_irq_handler, IRQF_TRIGGER_FALLING, "keyIRQ", &keyDev);
+	ret = request_irq(key_irq, key_irq_handler, IRQF_TRIGGER_FALLING, "keyIRQ", &keyDev);
+	if(ret != 0) {
+		dev_err(&dev, "request irq failed, ret %d\n", ret);
+		return ret;
+	}
 
 	keyDev.pdev = pdev;
 	keyDev.key_irq = key_irq;
