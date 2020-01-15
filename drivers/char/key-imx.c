@@ -19,6 +19,8 @@ struct key_dev {
 };
 struct key_dev keyDev;
 
+DECLARE_WAIT_QUEUE_HEAD(key_irq_waitQueueHead);
+
 int key_open(struct inode *inode, struct file *file)
 {
 	struct platform_device *pdev = keyDev.pdev;
@@ -45,10 +47,17 @@ ssize_t key_read(struct file *file, char __user *buf, size_t size, loff_t *offse
 	struct device dev = pdev->dev;
 	unsigned char status, ret;
 
+	DECLARE_WAITQUEUE(wq, current);
+	add_wait_queue(&key_irq_waitQueueHead, &wq);
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule();
+
 	status = keyDev.key_val;
 
 	ret = copy_to_user(buf, &status, size);
 	dev_dbg(&dev, "%s: status %d\n", __func__, status);
+
+	remove_wait_queue(&key_irq_waitQueueHead, &wq);
 
 	return 0;
 }
@@ -68,6 +77,8 @@ void work_func(struct work_struct *work)
 	dev_dbg(&dev, "%s: \n", __func__);
 
 	keyDev.key_val++;
+
+	wake_up(&key_irq_waitQueueHead);
 }
 
 DECLARE_WORK(key_irq_work, work_func);
