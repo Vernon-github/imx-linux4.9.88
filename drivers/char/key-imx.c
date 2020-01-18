@@ -7,6 +7,7 @@
 #include <asm/uaccess.h>
 #include <linux/of_irq.h>
 #include <linux/interrupt.h>
+#include <linux/poll.h>
 
 struct key_dev {
 	struct platform_device *pdev;
@@ -47,19 +48,41 @@ ssize_t key_read(struct file *file, char __user *buf, size_t size, loff_t *offse
 	struct device dev = pdev->dev;
 	unsigned char status, ret;
 
-	DECLARE_WAITQUEUE(wq, current);
-	add_wait_queue(&key_irq_waitQueueHead, &wq);
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule();
+	if(file->f_flags & O_NONBLOCK)
+	{
+		dev_dbg(&dev, "%s: nonblock IO mode\n", __func__);
+	}
+	else
+	{
+		dev_dbg(&dev, "%s: block IO mode\n", __func__);
+
+		DECLARE_WAITQUEUE(wq, current);
+		add_wait_queue(&key_irq_waitQueueHead, &wq);
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule(); // sleep, wait wake up
+
+		remove_wait_queue(&key_irq_waitQueueHead, &wq);
+	}
 
 	status = keyDev.key_val;
+	keyDev.key_val = 0;
 
 	ret = copy_to_user(buf, &status, size);
 	dev_dbg(&dev, "%s: status %d\n", __func__, status);
 
-	remove_wait_queue(&key_irq_waitQueueHead, &wq);
-
 	return 0;
+}
+
+unsigned int key_poll(struct file *file, struct poll_table_struct *wait)
+{
+	struct platform_device *pdev = keyDev.pdev;
+	struct device dev = pdev->dev;
+
+	dev_dbg(&dev, "%s: \n", __func__);
+
+	poll_wait(file, &key_irq_waitQueueHead, wait);
+
+	return keyDev.key_val? POLLIN : 0;
 }
 
 const struct file_operations key_fops = {
@@ -67,6 +90,7 @@ const struct file_operations key_fops = {
 	.open     = key_open,
 	.release  = key_release,
 	.read    = key_read,
+	.poll    = key_poll,
 };
 
 void work_func(struct work_struct *work)
@@ -76,7 +100,7 @@ void work_func(struct work_struct *work)
 
 	dev_dbg(&dev, "%s: \n", __func__);
 
-	keyDev.key_val++;
+	keyDev.key_val=1;
 
 	wake_up(&key_irq_waitQueueHead);
 }
