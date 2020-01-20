@@ -14,6 +14,8 @@ struct key_dev {
 	unsigned int key_irq;
 	unsigned char key_val;
 
+	struct fasync_struct *fasync_queue;
+
 	dev_t devid;
 	struct cdev cdev;
 	struct class *class;
@@ -85,12 +87,23 @@ unsigned int key_poll(struct file *file, struct poll_table_struct *wait)
 	return keyDev.key_val? POLLIN : 0;
 }
 
+int key_fasync(int fd, struct file *file, int on)
+{
+	struct platform_device *pdev = keyDev.pdev;
+	struct device dev = pdev->dev;
+
+	dev_dbg(&dev, "%s: \n", __func__);
+
+	return fasync_helper(fd, file, on, &keyDev.fasync_queue);
+}
+
 const struct file_operations key_fops = {
 	.owner    = THIS_MODULE,
 	.open     = key_open,
 	.release  = key_release,
 	.read    = key_read,
 	.poll    = key_poll,
+	.fasync  = key_fasync,
 };
 
 void work_func(struct work_struct *work)
@@ -103,6 +116,8 @@ void work_func(struct work_struct *work)
 	keyDev.key_val=1;
 
 	wake_up(&key_irq_waitQueueHead);
+
+	kill_fasync(&keyDev.fasync_queue, SIGIO, POLL_IN);
 }
 
 DECLARE_WORK(key_irq_work, work_func);
