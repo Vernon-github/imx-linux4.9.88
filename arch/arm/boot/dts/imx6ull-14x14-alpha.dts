@@ -89,7 +89,7 @@
 		compatible = "gpio-leds";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_gpio_leds
-			     &pinctrl_beep>;
+			    /* &pinctrl_beep */>;
 
 		led1{
 			label = "sys-led";
@@ -97,12 +97,13 @@
 			linux,default-trigger = "heartbeat";
 			default-state = "on";
 		};
-
+/*
 		beep{
 			label = "beep";
 			gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
 			default-state = "off";
 		};
+*/
 	};
 /*
 	atk-led {
@@ -114,6 +115,14 @@
 		state = "okay";
 	};
 */
+	atk-beep {
+		compatible = "atk,beep";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_beep>;
+
+		beep-gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
+		state = "okay";
+	};
 /*
 	gpio_keys: gpio_keys@0 {
 		compatible = "gpio-keys";
