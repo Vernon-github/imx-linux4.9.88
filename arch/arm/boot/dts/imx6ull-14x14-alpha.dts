@@ -123,23 +123,20 @@
 		beep-gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
 		state = "okay";
 	};
-/*
-	gpio_keys: gpio_keys@0 {
+
+	keys {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_gpio_keys>;
-		#address-cells = <1>;
-		#size-cells = <0>;
 		autorepeat;
 
-		key1@1 {
-			label = "USER-KEY1";
-			linux,code = <114>;
+		key0 {
+			label = "KEY0_ENTER";
+			linux,code = <KEY_ENTER>;
 			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
-			gpio-key,wakeup;
 		};
 	};
-*/
+/*
 	atk-key {
 		compatible = "atk,key";
 
@@ -148,7 +145,7 @@
 
 		state = "okay";
 	};
-
+*/
 	sound {
 		compatible = "fsl,imx6ul-evk-wm8960",
 			   "fsl,imx-audio-wm8960";
@@ -479,13 +476,13 @@
 				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
 			>;
 		};
-/*
+
 		pinctrl_gpio_keys: gpio-keys {
 			fsl,pins = <
 				MX6UL_PAD_UART1_CTS_B__GPIO1_IO18	0x80000000
 			>;
 		};
-
+/*
 		pinctrl_led: pinctrl-led {
 			fsl,pins = <
 				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
