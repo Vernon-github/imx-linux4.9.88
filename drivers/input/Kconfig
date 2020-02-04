@@ -187,6 +187,11 @@ config INPUT_APMPOWER
 	  To compile this driver as a module, choose M here: the
 	  module will be called apm-power.
 
+config KEYINPUT_IMX
+	tristate "keyinput imx6ull"
+	help
+	  This is keyinput imx6ull.
+
 comment "Input Device Drivers"
 
 source "drivers/input/keyboard/Kconfig"

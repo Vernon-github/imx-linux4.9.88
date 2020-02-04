@@ -94,8 +94,8 @@
 		led1{
 			label = "sys-led";
 			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "heartbeat";
-			default-state = "on";
+			linux,default-trigger = "none";
+			default-state = "off";
 		};
 /*
 		beep{
@@ -144,7 +144,7 @@
 		compatible = "atk,key";
 
 		interrupt-parent = <&gpio1>;
-		interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
+		interrupts = <18 IRQ_TYPE_EDGE_BOTH>;
 
 		state = "okay";
 	};
