@@ -616,5 +616,11 @@ config KEY_IMX
 	help
 	  This is the nxp,im6ull key gpio.
 
+config TIMER_IMX
+	tristate "nxp,imx6ull timer"
+	default n
+	help
+	  This is the nxp,im6ull timer.
+
 endmenu
 
