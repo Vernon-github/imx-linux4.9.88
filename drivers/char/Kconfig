@@ -622,5 +622,12 @@ config TIMER_IMX
 	help
 	  This is the nxp,im6ull timer.
 
+config COMPETITION_IMX
+	tristate "nxp,imx6ull competition function"
+	default n
+	help
+	  This is the nxp,im6ull competition function.
+
+
 endmenu
 
