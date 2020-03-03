@@ -379,16 +379,16 @@
 		status = "disabled";
 	};
 
-        goodix_ts@5d {
-                compatible = "goodix,gt9xx";
-                reg = <0x5d>;
-                status = "disabled";
-                interrupt-parent = <&gpio1>;
-                interrupts = <9 0>;
-                pinctrl-0 = <&ts_int_pin
-			     &ts_reset_pin>;
-		goodix,rst-gpio = <&gpio5 9  GPIO_ACTIVE_LOW>;
-		goodix,irq-gpio = <&gpio1 9  GPIO_ACTIVE_LOW>;
+	goodix_ts@14 {
+		compatible = "goodix,gt9147";
+		reg = <0x14>;
+
+		pinctrl-0 = <&ts_int_pin &ts_reset_pin>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpio = <&gpio5 9 GPIO_ACTIVE_LOW>;
+
+		status = "okay";
 	};
 
         sii902x: sii902x@39 {
