@@ -204,14 +204,6 @@
 			spi-max-frequency = <100000>;
 		};
 	};
-
-       sii902x_reset: sii902x-reset {
-                compatible = "gpio-reset";
-                reset-gpios = <&gpio5 9 1>;
-                reset-delay-us = <100000>;
-                #reset-cells = <0>;
-                status = "disabled";
-        };
 };
 
 &cpu0 {
@@ -365,44 +357,19 @@
 		};
 	};
 
-        edt-ft5x06@38 {
-		compatible = "edt,edt-ft5306", "edt,edt-ft5x06";
-		pinctrl-names = "default";
-		pinctrl-0 = <&ts_int_pin
-			     &ts_reset_pin>;
-
-		reg = <0x38>;
-		interrupt-parent = <&gpio1>;
-		interrupts = <9 0>;
-		reset-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
-
-		status = "disabled";
-	};
-
 	goodix_ts@14 {
 		compatible = "goodix,gt9147";
 		reg = <0x14>;
 
-		pinctrl-0 = <&ts_int_pin &ts_reset_pin>;
+		pinctrl-0 = <&ts_reset_pin &ts_int_pin>;
+		reset-gpio = <&gpio5 9 GPIO_ACTIVE_LOW>;
+		int-gpio = <&gpio1 9 GPIO_ACTIVE_LOW>;
+
 		interrupt-parent = <&gpio1>;
 		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
-		reset-gpio = <&gpio5 9 GPIO_ACTIVE_LOW>;
 
 		status = "okay";
 	};
-
-        sii902x: sii902x@39 {
-                compatible = "SiI,sii902x";
-                pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_sii902x>;
-                interrupt-parent = <&gpio1>;
-                interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
-                mode_str = "1024x768M@60";
-                bits-per-pixel = <16>;
-                resets = <&sii902x_reset>;
-                reg = <0x39>;
-                status = "disabled";
-        };
 };
 
 &iomuxc {
@@ -582,12 +549,6 @@
 			>;
 		};
 
-                pinctrl_sii902x: hdmigrp-1 {
-                        fsl,pins = <
-                                MX6UL_PAD_GPIO1_IO09__GPIO1_IO09        0x59
-                        >;
-                };
-
 		pinctrl_tsc: tscgrp {
 			fsl,pins = <
 				MX6UL_PAD_GPIO1_IO01__GPIO1_IO01	0xb0
@@ -752,13 +713,6 @@
 		pinctrl_dvfs: dvfsgrp {
                         fsl,pins = <
                                 MX6ULL_PAD_SNVS_TAMPER3__GPIO5_IO03      0x79
-                        >;
-                };
-
-		pinctrl_lcdif_reset: lcdifresetgrp {
-                        fsl,pins = <
-                                /* used for lcd reset */
-                                MX6ULL_PAD_SNVS_TAMPER9__GPIO5_IO09  0x79
                         >;
                 };
 
