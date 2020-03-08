@@ -117,4 +117,5 @@ all.config
 
 # kernel output dir
 output
+*.code-workspace
 

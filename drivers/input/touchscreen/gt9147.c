@@ -6,11 +6,14 @@
 #include <linux/gpio/consumer.h>
 #include <linux/of_irq.h>
 #include <linux/interrupt.h>
+#include <linux/input.h>
+#include <linux/input/mt.h>
 
 #define GT9147_ID_REGISTER  0x8140
 #define GT9147_CTL_REGISTER 0x8040
 #define GT9147_CFG_REGISTER 0x8047
 #define GT9147_STA_REGISTER 0x814E
+#define GT9147_DAT_REGISTER 0x814F
 
 #define MAX_SUPPORT_POINTS 5
 
@@ -20,6 +23,7 @@ struct gt9147_device {
     struct gpio_desc *reset_gpio;
     struct gpio_desc *int_gpio;
     unsigned int irq;
+    struct input_dev *inputdev;
 };
 struct gt9147_device gt9147Dev;
 
@@ -118,6 +122,9 @@ static irqreturn_t gt9147_irq_handler(int irq, void *dev)
 	struct i2c_client *client = p_gt9147Dev->client;
     struct regmap *regmap = p_gt9147Dev->regmap;
     unsigned int status = 0, touch_points = 0;
+    struct input_dev *inputdev = p_gt9147Dev->inputdev;
+    int slot[MAX_SUPPORT_POINTS], x[MAX_SUPPORT_POINTS], y[MAX_SUPPORT_POINTS], i, temp;
+    unsigned char data[40];
 
     regmap_read(regmap, GT9147_STA_REGISTER, &status);
     touch_points = status & 0x0000000f;
@@ -129,7 +136,28 @@ static irqreturn_t gt9147_irq_handler(int irq, void *dev)
         goto CLEAR_STATUS;
     }
 
+    /*
+     * 1. point number save to touch_points
+     * 2. which point save to slot
+     * 3. read position(x, y) save to x, y
+     */
+    regmap_bulk_read(regmap, GT9147_DAT_REGISTER, data, touch_points*8);
+    for(i=0; i<touch_points; i++) {
+        temp = i*8;
+        slot[i] = data[temp];
+        x[i] = data[temp+1] | (data[temp+2]<<8);
+        y[i] = data[temp+3] | (data[temp+4]<<8);
+        dev_dbg(&client->dev, "%s: slot %d, x %d, y %d\n",
+            __func__, slot[i], x[i], y[i]);
+    }
 
+    for(i=0; i<touch_points; i++) {
+        input_mt_slot(inputdev, slot[i]);
+        input_mt_report_slot_state(inputdev, MT_TOOL_FINGER, true);
+        input_report_abs(inputdev, ABS_MT_POSITION_X, x[i]);
+        input_report_abs(inputdev, ABS_MT_POSITION_Y, y[i]);
+    }
+    input_sync(inputdev);
 
 CLEAR_STATUS:
     regmap_write(regmap, GT9147_STA_REGISTER, 0x0);
@@ -143,6 +171,7 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
     struct device_node *np = dev.of_node;
     struct regmap_config config;
     unsigned int irq, ret;
+    struct input_dev *inputdev;
 
     dev_dbg(&dev, "%s: client addr 0x%x\n", __func__, client->addr);
 
@@ -162,8 +191,17 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
         return ret;
     }
 
+    inputdev = input_allocate_device();
+    inputdev->name = "gt9147_inputdev";
+    __set_bit(EV_ABS, inputdev->evbit);
+    input_set_abs_params(inputdev, ABS_MT_POSITION_X, 0, 480, 0, 0);
+    input_set_abs_params(inputdev, ABS_MT_POSITION_Y, 0, 272, 0, 0);
+    input_mt_init_slots(inputdev, MAX_SUPPORT_POINTS, 0);
+    ret = input_register_device(inputdev);
+
     gt9147Dev.client = client;
     gt9147Dev.irq = irq;
+    gt9147Dev.inputdev = inputdev;
 
     return 0;
 }
@@ -173,6 +211,8 @@ int gt9147_remove(struct i2c_client *client)
     gpiod_put(gt9147Dev.reset_gpio);
     gpiod_put(gt9147Dev.int_gpio);
     free_irq(gt9147Dev.irq, &gt9147Dev);
+    input_unregister_device(gt9147Dev.inputdev);
+    input_free_device(gt9147Dev.inputdev);
 
     return 0;
 }
