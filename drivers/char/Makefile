@@ -65,3 +65,4 @@ obj-$(CONFIG_HAVE_IMX_AMP)      += imx_amp/
 obj-$(CONFIG_KEY_IMX)     += key-imx.o
 obj-$(CONFIG_TIMER_IMX)   += timer-imx.o
 obj-$(CONFIG_COMPETITION_IMX)   += atomic-spinlock-semaphore-mutex.o
+obj-$(CONFIG_DEBUGFS_IMX)   += debugfs.o

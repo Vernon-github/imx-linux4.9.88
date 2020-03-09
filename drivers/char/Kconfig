@@ -628,6 +628,11 @@ config COMPETITION_IMX
 	help
 	  This is the nxp,im6ull competition function.
 
+config DEBUGFS_IMX
+	tristate "nxp,imx6ull debugfs function"
+	default n
+	help
+	  This is the nxp,im6ull debugfs function.
 
 endmenu
 
