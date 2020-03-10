@@ -20,9 +20,7 @@
 struct gt9147_device {
     struct i2c_client *client;
     struct regmap *regmap;
-    struct gpio_desc *reset_gpio;
     struct gpio_desc *int_gpio;
-    unsigned int irq;
     struct input_dev *inputdev;
 };
 struct gt9147_device gt9147Dev;
@@ -50,17 +48,17 @@ const unsigned char GT9147_CT[]=
 	0xff,0xff,0xff,0xff,
 };
 
-void gt9147_configure_register(struct device dev, struct regmap *regmap)
+void gt9147_configure_register(struct device *dev, struct regmap *regmap)
 {
     unsigned int configuer_version;
     unsigned char buf[2];
     unsigned int i;
 
     regmap_read(regmap, GT9147_CFG_REGISTER, &configuer_version);
-    dev_dbg(&dev, "%s: current configuer version is 0x%x\n", __func__, configuer_version);
+    dev_dbg(dev, "%s: current configuer version is 0x%x\n", __func__, configuer_version);
     if(configuer_version < GT9147_CT[0])
     {
-        dev_dbg(&dev, "%s: update configuer\n", __func__);
+        dev_dbg(dev, "%s: update configuer\n", __func__);
         regmap_bulk_write(regmap, GT9147_CFG_REGISTER, GT9147_CT, sizeof(GT9147_CT));
 
         buf[0] = 0; // configuration information Check code
@@ -75,15 +73,15 @@ void gt9147_configure_register(struct device dev, struct regmap *regmap)
 
 void gt9147_reset(struct i2c_client *client)
 {
-    struct device dev = client->dev;
+    struct device *dev = &client->dev;
     struct regmap *regmap = gt9147Dev.regmap;
     struct gpio_desc *reset_gpio;
     struct gpio_desc *int_gpio;
 
-    dev_dbg(&dev, "%s\n", __func__);
+    dev_dbg(dev, "%s\n", __func__);
 
-    reset_gpio = gpiod_get(&dev, "reset", GPIOD_OUT_LOW);
-    int_gpio = gpiod_get(&dev, "int", GPIOD_OUT_LOW);
+    reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+    int_gpio = devm_gpiod_get(dev, "int", GPIOD_OUT_LOW);
 
     // hardware reset
     gpiod_set_value(reset_gpio, true);
@@ -101,19 +99,18 @@ void gt9147_reset(struct i2c_client *client)
     mdelay(200);
     regmap_write(regmap, GT9147_CTL_REGISTER, 0x00); // goto read (x,y)
 
-    gt9147Dev.reset_gpio = reset_gpio;
     gt9147Dev.int_gpio = int_gpio;
 }
 
 void gt9147_read_ID(struct i2c_client *client)
 {
-    struct device dev = client->dev;
+    struct device *dev = &client->dev;
     struct regmap *regmap = gt9147Dev.regmap;
     unsigned char ID[5];
 
     regmap_bulk_read(regmap, GT9147_ID_REGISTER, ID, sizeof(ID)-1);
     ID[4]='\0';
-    dev_dbg(&dev, "%s: ID %s\n", __func__, ID);
+    dev_dbg(dev, "%s: ID %s\n", __func__, ID);
 }
 
 static irqreturn_t gt9147_irq_handler(int irq, void *dev)
@@ -167,12 +164,12 @@ CLEAR_STATUS:
 
 int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-    struct device dev = client->dev;
+    struct device *dev = &client->dev;
     struct regmap_config config;
     unsigned int irq, ret;
     struct input_dev *inputdev;
 
-    dev_dbg(&dev, "%s: client addr 0x%x\n", __func__, client->addr);
+    dev_dbg(dev, "%s: client addr 0x%x\n", __func__, client->addr);
 
     memset(&config, 0, sizeof(config));
     config.reg_bits = 16;
@@ -183,14 +180,14 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
     gt9147_read_ID(client);
 
     irq = gpiod_to_irq(gt9147Dev.int_gpio);
-    ret = request_threaded_irq(irq, NULL, gt9147_irq_handler,
+    ret = devm_request_threaded_irq(dev, irq, NULL, gt9147_irq_handler,
         IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "gt9147IRQ", &gt9147Dev);
     if(ret != 0) {
-        dev_err(&dev, "request irq failed, ret %d\n", ret);
+        dev_err(dev, "request irq failed, ret %d\n", ret);
         return ret;
     }
 
-    inputdev = input_allocate_device();
+    inputdev = devm_input_allocate_device(dev);
     inputdev->name = "gt9147_inputdev";
     __set_bit(EV_ABS, inputdev->evbit);
     input_set_abs_params(inputdev, ABS_MT_POSITION_X, 0, 480, 0, 0);
@@ -199,7 +196,6 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
     ret = input_register_device(inputdev);
 
     gt9147Dev.client = client;
-    gt9147Dev.irq = irq;
     gt9147Dev.inputdev = inputdev;
 
     return 0;
@@ -207,11 +203,7 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 int gt9147_remove(struct i2c_client *client)
 {
-    gpiod_put(gt9147Dev.reset_gpio);
-    gpiod_put(gt9147Dev.int_gpio);
-    free_irq(gt9147Dev.irq, &gt9147Dev);
     input_unregister_device(gt9147Dev.inputdev);
-    input_free_device(gt9147Dev.inputdev);
 
     return 0;
 }
