@@ -1,4 +1,4 @@
-#define DEBUG
+/* #define DEBUG */
 
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -168,7 +168,6 @@ CLEAR_STATUS:
 int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct device dev = client->dev;
-    struct device_node *np = dev.of_node;
     struct regmap_config config;
     unsigned int irq, ret;
     struct input_dev *inputdev;
@@ -183,7 +182,7 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
     gt9147_reset(client);
     gt9147_read_ID(client);
 
-    irq = irq_of_parse_and_map(np, 0);
+    irq = gpiod_to_irq(gt9147Dev.int_gpio);
     ret = request_threaded_irq(irq, NULL, gt9147_irq_handler,
         IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "gt9147IRQ", &gt9147Dev);
     if(ret != 0) {

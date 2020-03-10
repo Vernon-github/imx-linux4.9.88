@@ -361,12 +361,10 @@
 		compatible = "goodix,gt9147";
 		reg = <0x14>;
 
+		pinctrl-names = "default";
 		pinctrl-0 = <&ts_reset_pin &ts_int_pin>;
 		reset-gpio = <&gpio5 9 GPIO_ACTIVE_LOW>;
 		int-gpio = <&gpio1 9 GPIO_ACTIVE_LOW>;
-
-		interrupt-parent = <&gpio1>;
-		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
 
 		status = "okay";
 	};
