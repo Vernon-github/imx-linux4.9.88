@@ -8,6 +8,7 @@
 #include <linux/interrupt.h>
 #include <linux/input.h>
 #include <linux/input/mt.h>
+#include <linux/debugfs.h>
 
 #define GT9147_ID_REGISTER  0x8140
 #define GT9147_CTL_REGISTER 0x8040
@@ -22,6 +23,8 @@ struct gt9147_device {
     struct regmap *regmap;
     struct gpio_desc *int_gpio;
     struct input_dev *inputdev;
+    struct dentry *touchDir;
+    unsigned int touch;
 };
 struct gt9147_device gt9147Dev;
 
@@ -125,8 +128,8 @@ static irqreturn_t gt9147_irq_handler(int irq, void *dev)
 
     regmap_read(regmap, GT9147_STA_REGISTER, &status);
     touch_points = status & 0x0000000f;
-    dev_dbg(&client->dev, "%s: status 0x%x, touch_points 0x%x\n",
-        __func__, status, touch_points);
+    dev_dbg(&client->dev, "%s: status 0x%x, touch_points 0x%x, touch %d\n",
+        __func__, status, touch_points, p_gt9147Dev->touch);
 
     if(!touch_points) {
         dev_dbg(&client->dev, "%s: number of touch points is 0\n", __func__);
@@ -150,7 +153,7 @@ static irqreturn_t gt9147_irq_handler(int irq, void *dev)
 
     for(i=0; i<touch_points; i++) {
         input_mt_slot(inputdev, slot[i]);
-        input_mt_report_slot_state(inputdev, MT_TOOL_FINGER, true);
+        input_mt_report_slot_state(inputdev, MT_TOOL_FINGER, p_gt9147Dev->touch);
         input_report_abs(inputdev, ABS_MT_POSITION_X, x[i]);
         input_report_abs(inputdev, ABS_MT_POSITION_Y, y[i]);
     }
@@ -195,6 +198,9 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
     input_mt_init_slots(inputdev, MAX_SUPPORT_POINTS, 0);
     ret = input_register_device(inputdev);
 
+    gt9147Dev.touchDir = debugfs_create_dir("touchDir", NULL);
+    debugfs_create_u32("touch", 0644, gt9147Dev.touchDir, &gt9147Dev.touch);
+
     gt9147Dev.client = client;
     gt9147Dev.inputdev = inputdev;
 
@@ -204,6 +210,7 @@ int gt9147_probe(struct i2c_client *client, const struct i2c_device_id *id)
 int gt9147_remove(struct i2c_client *client)
 {
     input_unregister_device(gt9147Dev.inputdev);
+    debugfs_remove_recursive(gt9147Dev.touchDir);
 
     return 0;
 }
