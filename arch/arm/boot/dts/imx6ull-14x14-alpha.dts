@@ -46,7 +46,7 @@
 
 	pxp_v4l2 {
 		compatible = "fsl,imx6ul-pxp-v4l2", "fsl,imx6sx-pxp-v4l2", "fsl,imx6sl-pxp-v4l2";
-		status = "okay";
+		status = "disabled";
 	};
 
 	regulators {
@@ -218,7 +218,7 @@
 };
 
 &csi {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		csi1_ep: endpoint {
@@ -349,7 +349,7 @@
 		csi_id = <0>;
 		mclk = <24000000>;
 		mclk_source = <0>;
-		status = "okay";
+		status = "disabled";
 		port {
 			ov5640_ep: endpoint {
 				remote-endpoint = <&csi1_ep>;
