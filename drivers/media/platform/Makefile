@@ -14,6 +14,7 @@ obj-$(CONFIG_VIDEO_PXA27x)	+= pxa_camera.o
 obj-$(CONFIG_VIDEO_VIU) += fsl-viu.o
 
 obj-$(CONFIG_VIDEO_VIVID)		+= vivid/
+obj-$(CONFIG_VIDEO_TVIVID)		+= tvivid/
 obj-$(CONFIG_VIDEO_VIM2M)		+= vim2m.o
 
 obj-$(CONFIG_VIDEO_TI_VPE)		+= ti-vpe/

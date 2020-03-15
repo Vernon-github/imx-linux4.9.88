@@ -204,6 +204,12 @@
 			spi-max-frequency = <100000>;
 		};
 	};
+
+	test-vivid {
+		compatible = "test,vivid";
+		state = "okay";
+	};
+
 };
 
 &cpu0 {

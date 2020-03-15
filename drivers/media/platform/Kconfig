@@ -377,6 +377,7 @@ menuconfig V4L_TEST_DRIVERS
 if V4L_TEST_DRIVERS
 
 source "drivers/media/platform/vivid/Kconfig"
+source "drivers/media/platform/tvivid/Kconfig"
 
 config VIDEO_VIM2M
 	tristate "Virtual Memory-to-Memory Driver"
