@@ -6,13 +6,76 @@
 #include <media/v4l2-device.h>
 #include <media/videobuf2-v4l2.h>
 #include <media/v4l2-ioctl.h>
+#include <media/videobuf2-vmalloc.h>
 
 struct tvivid_device {
 	struct video_device vdev;
 	struct v4l2_device v4l2_dev;
+	struct vb2_queue queue;
 };
 struct tvivid_device *tvivid;
 
+struct tvivid_buffer {
+	/* common v4l buffer stuff -- must be first */
+	struct vb2_v4l2_buffer vb;
+	struct list_head	list;
+};
+
+int tvivid_queue_setup(struct vb2_queue *q,
+		unsigned int *num_buffers, unsigned int *num_planes,
+		unsigned int sizes[], struct device *alloc_devs[])
+{
+	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(q);
+	struct device *dev = &tvivid_dev->vdev.dev;
+
+	dev_dbg(dev, "%s: \n", __func__);
+
+	return 0;
+}
+
+int tvivid_buf_prepare(struct vb2_buffer *vb)
+{
+	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(vb->vb2_queue);
+	struct device *dev = &tvivid_dev->vdev.dev;
+
+	dev_dbg(dev, "%s: \n", __func__);
+
+	return 0;
+}
+
+void tvivid_buf_queue(struct vb2_buffer *vb)
+{
+	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(vb->vb2_queue);
+	struct device *dev = &tvivid_dev->vdev.dev;
+
+	dev_dbg(dev, "%s: \n", __func__);
+}
+
+int tvivid_start_streaming(struct vb2_queue *q, unsigned int count)
+{
+	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(q);
+	struct device *dev = &tvivid_dev->vdev.dev;
+
+	dev_dbg(dev, "%s: \n", __func__);
+
+	return 0;
+}
+
+void tvivid_stop_streaming(struct vb2_queue *q)
+{
+	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(q);
+	struct device *dev = &tvivid_dev->vdev.dev;
+
+	dev_dbg(dev, "%s: \n", __func__);
+}
+
+const struct vb2_ops tvivid_queue_ops = {
+	.queue_setup     = tvivid_queue_setup,
+	.buf_prepare     = tvivid_buf_prepare,
+	.buf_queue       = tvivid_buf_queue,
+	.start_streaming = tvivid_start_streaming,
+	.stop_streaming  = tvivid_stop_streaming,
+};
 
 int tvidioc_querycap(struct file *file, void *fh, struct v4l2_capability *cap)
 {
@@ -89,6 +152,7 @@ int tvivid_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct video_device *vdev;
+	struct vb2_queue *queue;
 	int ret;
 
 	dev_dbg(dev, "%s: \n", __func__);
@@ -96,6 +160,16 @@ int tvivid_probe(struct platform_device *pdev)
 	tvivid = kzalloc(sizeof(*tvivid), GFP_KERNEL);
 
 	ret = v4l2_device_register(dev, &tvivid->v4l2_dev);
+
+	queue = &tvivid->queue;
+	queue->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	queue->io_modes = VB2_MMAP;
+	queue->ops = &tvivid_queue_ops;
+	queue->mem_ops = &vb2_vmalloc_memops;
+	queue->buf_struct_size = sizeof(struct tvivid_buffer);
+	queue->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
+	queue->drv_priv = tvivid;
+	ret = vb2_queue_init(queue);
 
 	vdev = &tvivid->vdev;
 	vdev->fops = &tvivid_fops;
