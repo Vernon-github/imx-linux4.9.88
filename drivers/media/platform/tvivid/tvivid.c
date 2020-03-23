@@ -19,6 +19,10 @@ struct tvivid_device {
 
 	unsigned int width;
 	unsigned int height;
+	unsigned int pixelformat;
+
+	unsigned int bytesperline;
+	unsigned int sizeimage;
 };
 struct tvivid_device *tvivid;
 
@@ -49,9 +53,10 @@ int tvivid_queue_setup(struct vb2_queue *q,
 	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(q);
 	struct device *dev = &tvivid_dev->vdev.dev;
 
-	dev_dbg(dev, "%s: num_buffers %d\n", __func__, *num_buffers);
+	dev_dbg(dev, "%s: num_buffers %d, sizeimage %d\n",
+		__func__, *num_buffers, tvivid_dev->sizeimage);
 
-	sizes[0] = tvivid_dev->width * tvivid_dev->height * 2;
+	sizes[0] = tvivid_dev->sizeimage;
 	*num_planes = 1;
 
 	return 0;
@@ -64,7 +69,7 @@ int tvivid_buf_prepare(struct vb2_buffer *vb)
 
 	dev_dbg(dev, "%s: \n", __func__);
 
-	vb2_set_plane_payload(vb, 0, tvivid_dev->width * tvivid_dev->height * 2);
+	vb2_set_plane_payload(vb, 0, tvivid_dev->sizeimage);
 
 	return 0;
 }
@@ -95,7 +100,7 @@ static int tvivid_kthread(void *data)
 		list_del(&buf->list);
 
 		vbuf = vb2_plane_vaddr(&buf->vb.vb2_buf, 0);
-		memset(vbuf, 0x88, tvivid_dev->width * tvivid_dev->height * 2);
+		memset(vbuf, 0x88, tvivid_dev->sizeimage);
 
 		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 		msleep(100);
@@ -178,8 +183,16 @@ int tvivid_g_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format *f)
 {
 	struct tvivid_device *tvivid_dev = video_drvdata(file);
 	struct device *dev = &tvivid_dev->vdev.dev;
+	struct v4l2_pix_format pix = f->fmt.pix;
 
 	dev_dbg(dev, "%s: \n", __func__);
+
+	pix.width = tvivid_dev->width;
+	pix.height = tvivid_dev->height;
+	pix.pixelformat = tvivid_dev->pixelformat;
+
+	pix.bytesperline = tvivid_dev->bytesperline;
+	pix.sizeimage = tvivid_dev->sizeimage;
 
 	return 0;
 }
@@ -189,12 +202,21 @@ int tvivid_s_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format *f)
 	struct tvivid_device *tvivid_dev = video_drvdata(file);
 	struct device *dev = &tvivid_dev->vdev.dev;
 	struct v4l2_pix_format pix = f->fmt.pix;
+	int i;
 
 	dev_dbg(dev, "%s: width %d, height %d, bytesperline %d, sizeimage %d\n",
 		__func__, pix.width, pix.height, pix.bytesperline, pix.sizeimage);
 
 	tvivid_dev->width = pix.width;
 	tvivid_dev->height = pix.height;
+	tvivid_dev->pixelformat = pix.pixelformat;
+
+	for(i=0; i<ARRAY_SIZE(tvivid_formats); i++) {
+		if(pix.pixelformat == tvivid_formats[i].pixelformat)
+			break;
+	}
+	tvivid_dev->bytesperline = tvivid_dev->width * (tvivid_formats[i].bit_depth >> 3);
+	tvivid_dev->sizeimage = tvivid_dev->bytesperline * tvivid_dev->height;
 
 	return 0;
 }
