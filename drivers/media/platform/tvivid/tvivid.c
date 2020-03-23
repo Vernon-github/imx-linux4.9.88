@@ -7,18 +7,39 @@
 #include <media/videobuf2-v4l2.h>
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-vmalloc.h>
+#include <linux/delay.h>
 
 struct tvivid_device {
 	struct video_device vdev;
 	struct v4l2_device v4l2_dev;
 	struct vb2_queue queue;
+	struct mutex mutex;
+	struct list_head list;
+	struct task_struct *kthread;
+
+	unsigned int width;
+	unsigned int height;
 };
 struct tvivid_device *tvivid;
 
 struct tvivid_buffer {
 	/* common v4l buffer stuff -- must be first */
 	struct vb2_v4l2_buffer vb;
-	struct list_head	list;
+	struct list_head list;
+};
+
+struct tvivid_fmt {
+	u32	pixelformat;
+	u32	bit_depth;
+	u8	buffers;
+};
+
+struct tvivid_fmt tvivid_formats[] = {
+	{
+		.pixelformat = V4L2_PIX_FMT_RGB565, /* gggbbbbb rrrrrggg */
+		.bit_depth   = 16,
+		.buffers     = 1,
+	},
 };
 
 int tvivid_queue_setup(struct vb2_queue *q,
@@ -28,7 +49,10 @@ int tvivid_queue_setup(struct vb2_queue *q,
 	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(q);
 	struct device *dev = &tvivid_dev->vdev.dev;
 
-	dev_dbg(dev, "%s: \n", __func__);
+	dev_dbg(dev, "%s: num_buffers %d\n", __func__, *num_buffers);
+
+	sizes[0] = tvivid_dev->width * tvivid_dev->height * 2;
+	*num_planes = 1;
 
 	return 0;
 }
@@ -40,6 +64,8 @@ int tvivid_buf_prepare(struct vb2_buffer *vb)
 
 	dev_dbg(dev, "%s: \n", __func__);
 
+	vb2_set_plane_payload(vb, 0, tvivid_dev->width * tvivid_dev->height * 2);
+
 	return 0;
 }
 
@@ -47,8 +73,35 @@ void tvivid_buf_queue(struct vb2_buffer *vb)
 {
 	struct tvivid_device *tvivid_dev = vb2_get_drv_priv(vb->vb2_queue);
 	struct device *dev = &tvivid_dev->vdev.dev;
+	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
+	struct tvivid_buffer *buf = container_of(vbuf, struct tvivid_buffer, vb);
 
 	dev_dbg(dev, "%s: \n", __func__);
+
+	list_add_tail(&buf->list, &tvivid_dev->list);
+}
+
+static int tvivid_kthread(void *data)
+{
+	struct tvivid_device *tvivid_dev = data;
+	struct tvivid_buffer *buf = NULL;
+	void *vbuf;
+
+	for (;;) {
+		if (kthread_should_stop())
+			break;
+
+		buf = list_entry(tvivid_dev->list.next, struct tvivid_buffer, list);
+		list_del(&buf->list);
+
+		vbuf = vb2_plane_vaddr(&buf->vb.vb2_buf, 0);
+		memset(vbuf, 0x98, 460800);
+
+		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
+		msleep(100);
+	}
+
+	return 0;
 }
 
 int tvivid_start_streaming(struct vb2_queue *q, unsigned int count)
@@ -57,6 +110,8 @@ int tvivid_start_streaming(struct vb2_queue *q, unsigned int count)
 	struct device *dev = &tvivid_dev->vdev.dev;
 
 	dev_dbg(dev, "%s: \n", __func__);
+
+	tvivid_dev->kthread = kthread_run(tvivid_kthread, tvivid_dev, "tvivid-kthread");
 
 	return 0;
 }
@@ -67,6 +122,17 @@ void tvivid_stop_streaming(struct vb2_queue *q)
 	struct device *dev = &tvivid_dev->vdev.dev;
 
 	dev_dbg(dev, "%s: \n", __func__);
+
+	while (!list_empty(&tvivid_dev->list)) {
+		struct tvivid_buffer *buf;
+
+		buf = list_entry(tvivid_dev->list.next,
+					struct tvivid_buffer, list);
+		list_del(&buf->list);
+		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+	}
+
+	kthread_stop(tvivid_dev->kthread);
 }
 
 const struct vb2_ops tvivid_queue_ops = {
@@ -84,6 +150,10 @@ int tvidioc_querycap(struct file *file, void *fh, struct v4l2_capability *cap)
 
 	dev_dbg(dev, "%s: \n", __func__);
 
+	strcpy(cap->driver, "tvivid_driver");
+	strcpy(cap->card, "tvivid_card");
+	strcpy(cap->bus_info, "tvivid_bus_info");
+
 	return 0;
 }
 
@@ -91,8 +161,12 @@ int tvivid_enum_fmt_vid_cap(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 {
 	struct tvivid_device *tvivid_dev = video_drvdata(file);
 	struct device *dev = &tvivid_dev->vdev.dev;
+	struct tvivid_fmt *fmt;
 
-	dev_dbg(dev, "%s: \n", __func__);
+	dev_dbg(dev, "%s: index %d\n", __func__, f->index);
+
+	fmt = &tvivid_formats[f->index];
+	f->pixelformat = fmt->pixelformat;
 
 	return 0;
 }
@@ -111,8 +185,13 @@ int tvivid_s_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format *f)
 {
 	struct tvivid_device *tvivid_dev = video_drvdata(file);
 	struct device *dev = &tvivid_dev->vdev.dev;
+	struct v4l2_pix_format pix = f->fmt.pix;
 
-	dev_dbg(dev, "%s: \n", __func__);
+	dev_dbg(dev, "%s: width %d, height %d, bytesperline %d, sizeimage %d\n",
+		__func__, pix.width, pix.height, pix.bytesperline, pix.sizeimage);
+
+	tvivid_dev->width = pix.width;
+	tvivid_dev->height = pix.height;
 
 	return 0;
 }
@@ -161,6 +240,9 @@ int tvivid_probe(struct platform_device *pdev)
 
 	ret = v4l2_device_register(dev, &tvivid->v4l2_dev);
 
+	INIT_LIST_HEAD(&tvivid->list);
+	mutex_init(&tvivid->mutex);
+
 	queue = &tvivid->queue;
 	queue->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	queue->io_modes = VB2_MMAP;
@@ -168,6 +250,7 @@ int tvivid_probe(struct platform_device *pdev)
 	queue->mem_ops = &vb2_vmalloc_memops;
 	queue->buf_struct_size = sizeof(struct tvivid_buffer);
 	queue->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
+	queue->lock = &tvivid->mutex;
 	queue->drv_priv = tvivid;
 	ret = vb2_queue_init(queue);
 
@@ -177,6 +260,7 @@ int tvivid_probe(struct platform_device *pdev)
 	vdev->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING;
 	vdev->release = tvivid_release;
 	vdev->v4l2_dev = &tvivid->v4l2_dev;
+	vdev->queue = queue;
 	video_set_drvdata(vdev, tvivid);
 	ret = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
 
