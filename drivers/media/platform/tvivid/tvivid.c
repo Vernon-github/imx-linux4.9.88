@@ -95,7 +95,7 @@ static int tvivid_kthread(void *data)
 		list_del(&buf->list);
 
 		vbuf = vb2_plane_vaddr(&buf->vb.vb2_buf, 0);
-		memset(vbuf, 0x98, 460800);
+		memset(vbuf, 0x88, tvivid_dev->width * tvivid_dev->height * 2);
 
 		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 		msleep(100);
@@ -164,6 +164,9 @@ int tvivid_enum_fmt_vid_cap(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 	struct tvivid_fmt *fmt;
 
 	dev_dbg(dev, "%s: index %d\n", __func__, f->index);
+
+	if (f->index >= ARRAY_SIZE(tvivid_formats))
+		return -EINVAL;
 
 	fmt = &tvivid_formats[f->index];
 	f->pixelformat = fmt->pixelformat;
