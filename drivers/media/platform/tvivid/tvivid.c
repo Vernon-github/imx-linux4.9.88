@@ -35,14 +35,12 @@ struct tvivid_buffer {
 struct tvivid_fmt {
 	u32	pixelformat;
 	u32	bit_depth;
-	u8	buffers;
 };
 
 struct tvivid_fmt tvivid_formats[] = {
 	{
 		.pixelformat = V4L2_PIX_FMT_RGB565, /* gggbbbbb rrrrrggg */
 		.bit_depth   = 16,
-		.buffers     = 1,
 	},
 };
 
